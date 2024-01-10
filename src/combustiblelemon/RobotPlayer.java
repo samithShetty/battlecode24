@@ -110,21 +110,22 @@ public strictfp class RobotPlayer {
                             rc.move(dir);
                     }
                     Direction randDir = directions[rng.nextInt(directions.length)];
-                    // Sense Nearby Enemies
+
+                    // Sense/Target Nearby Enemies
                     RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
                     if (enemyRobots.length > 0) {
-                        // Attack the first enemy in range, otherwise keep track of the closest one 
+                        // Attack the first enemy in range, otherwise keep track of the closest one
                         boolean attacking = false;
-                        MapLocation closestEnemyLoc = enemyRobots[0].getLocation();                        
+                        MapLocation closestEnemyLoc = enemyRobots[0].getLocation();
                         int closestEnemyDist = 9999;
                         for (RobotInfo enemy : enemyRobots) {
                             MapLocation enemyLoc = enemy.getLocation();
                             if (rc.canAttack(enemyLoc)) {
                                 rc.attack(enemyLoc);
                                 attacking = true;
+                                rc.setIndicatorString("Attacking Enemy: " + enemy.getID());
                                 break;
-                            }
-                            else {
+                            } else {
                                 int enemyDist = rc.getLocation().distanceSquaredTo(enemyLoc);
                                 if (enemyDist < closestEnemyDist) {
                                     closestEnemyDist = enemyDist;
@@ -136,17 +137,26 @@ public strictfp class RobotPlayer {
                         if (!attacking) {
                             Direction moveDir;
                             moveDir = rc.getLocation().directionTo(closestEnemyLoc);
-                            if (rc.canMove(moveDir)) {rc.move(moveDir);}
-                            if (rc.canAttack(closestEnemyLoc)) {rc.attack(closestEnemyLoc);} // If we moved in attack range, attack now
+                            if (rc.canMove(moveDir)) {
+                                rc.move(moveDir);
+                            }
+                            // If we moved in attack range, attack now
+                            if (rc.canAttack(closestEnemyLoc)) {
+                                rc.attack(closestEnemyLoc);
+                            } 
+                            boolean healing = healNearbyAllies(rc);
                         }
                     } else {
-                        // Move and attack randomly if no objective.
-                        MapLocation nextLoc = rc.getLocation().add(randDir);
-                        if (rc.canMove(randDir)) {
-                            rc.move(randDir);
-                        } else if (rc.canAttack(nextLoc)) {
-                            rc.attack(nextLoc);
-                            System.out.println("Take that! Damaged an enemy that was in our way!");
+                        // Check if nearby allies need healing
+                        boolean healing = healNearbyAllies(rc);
+                        if (!healing) {
+                            // Move and attack randomly if no objective.
+                            MapLocation nextLoc = rc.getLocation().add(randDir);
+                            if (rc.canMove(randDir)) {
+                                rc.move(randDir);
+                            } else if (rc.canAttack(nextLoc)) {
+                                rc.attack(nextLoc);
+                            }
                         }
                     }
 
@@ -205,5 +215,18 @@ public strictfp class RobotPlayer {
                 int numEnemies = rc.readSharedArray(0);
             }
         }
+    }
+
+    public static boolean healNearbyAllies(RobotController rc) throws GameActionException {
+        RobotInfo[] nearbyAllies = rc.senseNearbyRobots(-1, rc.getTeam());
+        for (RobotInfo ally : nearbyAllies) {
+            MapLocation allyLoc = ally.getLocation();
+            if (rc.canHeal(allyLoc)) {
+                rc.heal(allyLoc);
+                rc.setIndicatorString("Healing Ally: " + ally.getID());
+                return true;
+            }
+        }
+        return false;
     }
 }
